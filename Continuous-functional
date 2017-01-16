@@ -1,0 +1,55 @@
+- job:
+    name: Continuous-Test/Continuous-andre
+    project-type: multijob
+    defaults: global
+    description: 'Run Continuous Functional Test'
+    disabled: false
+    display-name: 'Continuous Integration'
+    workspace: /home/jenkins/Continuous-Test/Continuous-andre
+    quiet-period: 5
+    block-downstream: false
+    block-upstream: false
+    retry-count: 3
+    node: regression
+    logrotate:
+      daysToKeep: 3
+      numToKeep: 20
+      artifactDaysToKeep: -1
+      artifactNumToKeep: -1
+    triggers:
+    - timed: '@hourly'
+    scm:
+      - git:
+         url: https://github.com/RackHD/RackHD.git
+         branches:
+          - origin/master
+         skip-tag: true
+         basedir: build
+         wipe-workspace: true
+    builders:
+       - shell:
+          echo "testing with minimal  requirement"
+       - multijob:
+          name: Configure
+          condition: SUCCESSFUL
+          projects:
+            - name: Continuous-Test/build-config-setup
+              current-parameters: true
+              node-parameters: true
+              predefined-parameters: WORKSPACE=${WORKSPACE}
+       - shell: |
+          export SKIP_PREP_DEP=false
+          ln -s build RackHD
+          build-config/test.sh
+       - multijob:
+          name: Run CIT
+          condition: SUCCESSFUL
+          projects:
+            - name: Templates/cit-test
+              current-parameters: true
+              node-parameters: true
+              predefined-parameters: |
+                WORKSPACE=${WORKSPACE}
+                SKIP_PREP_DEP=true
+                RUN_CIT_TEST=true
+                RUN_FIT_TEST=false
